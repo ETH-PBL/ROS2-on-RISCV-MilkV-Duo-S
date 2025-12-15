@@ -18,7 +18,7 @@ This project implements a complete ROS2 Humble system on the MilkV Duo S (RISC-V
 ### Option 1: Use Prepared Image (Recommended)
 
 **1. Flash the Image**
-- Download `milkV-duoS_ROS_demo.img`
+- Download `milkV-duoS_ROS_demo` from the [zenodo page](https://zenodo.org/records/17723913)
 - Use balenaEtcher or similar to write it to the SD card
 - Insert SD card into MilkV Duo S
 
