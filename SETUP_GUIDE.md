@@ -374,7 +374,7 @@ sudo apt update
 sudo apt install -y qemu-system-riscv64
 ```
 ## 2.2: Setup VM
-Inside project folder: Get these files from this repository:
+Inside project folder: Get these files from the [zenodo page](https://zenodo.org/records/17723913):
 - `ubuntu-22.04-server-cloudimg-riscv64-initrd-generic`
 - `ubuntu-22.04-server-cloudimg-riscv64-vmlinuz-generic`
 - `user-data.img`
