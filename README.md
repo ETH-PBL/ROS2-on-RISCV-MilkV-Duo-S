@@ -122,6 +122,16 @@ ros2 launch drone_visualization visualize_drone.launch.py
 - **Visualization:** Robot state publisher + RViz2 drone model
 
 ---
+## Hardware setup (Crazyflie 2.1 custom deck)
+
+While this repository can be used with a standalone Milk-V Duo S board wired to a Crazyflie via UART, the longer-term target of the project is a **custom Crazyflie 2.1 expansion deck** that brings the compute module *onto* the nano-UAV.
+
+For this purpose, we designed and manufactured the **BT-MV Duo 01 Deck**, a Crazyflie-compatible deck integrating a **Milk-V Duo Module 01**. The intent is to provide the computational resources required by the software stack in this repository in a mechanically compatible, lightweight form factor, with board-level power integration and the necessary interconnects for UART debug and future peripherals (e.g., SD/MMC, USB, and a camera interface).
+
+The complete hardware documentation is in:
+- [`Hardware Setup/HW_README.md`](Hardware%20Setup/HW_README.md)
+
+---
 ## File Reference
 - **This file:** Quick start guide
 - **`SETUP_GUIDE.md`:** Complete build instructions from scratch
