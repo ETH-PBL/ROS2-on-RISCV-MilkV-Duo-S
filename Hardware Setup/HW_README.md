@@ -20,18 +20,18 @@ This repository contains the hardware design for a Crazyflie 2.1 deck integratin
 ---
 
 ## What works (verified on Rev-A)
-### ✅ Power & regulation
+### Power & regulation
 - 3.3 V rail is stable across expected input conditions
 - VBUS/VCOM switchover behaves as intended (no brown-out observed during switching)
 
-### ✅ Boot & console
+### Boot & console
 - RISC-V boot path reachable via UART
 - U-Boot prompt available and interactive
 
 ---
 
 ## What does *not* work yet (known issues)
-### ❌ SD/MMC (microSD)
+### SD/MMC (microSD)
 Symptoms:
 - SDHCI initialisation repeatedly times out
 - Environment load from FAT fails; boot falls back to defaults
@@ -40,7 +40,7 @@ Most likely causes (current hypotheses):
 - Signal integrity / timing margin issues on CMD/CLK/DAT lines
 - Protection / filtering choice on the SD bus introducing too much series impedance
 
-### ❌ USB (device not recognised)
+### USB (device not recognised)
 Symptoms:
 - VBUS present (board powers), but host does not enumerate the device
 - Removing protection components on D+/D− did not resolve enumeration
@@ -49,7 +49,7 @@ Most likely causes (current hypotheses):
 - Attach signalling / CC configuration (if USB-C path is involved)
 - D+/D− routing/impedance/return path issues
 
-### ⚠️ Camera
+### Camera
 - Camera rails exist and basic clock presence was observed on Rev-A,
   but full camera bring-up is blocked until a reliable flashing / data path exists
   (SD and/or USB need to work first).
