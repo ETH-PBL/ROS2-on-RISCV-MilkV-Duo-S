@@ -59,28 +59,9 @@ Most likely causes (current hypotheses):
 ## Repository structure
 ```text
 BT-MV Duo 01 Deck/
-  BT-MV Duo 01 Deck.kicad_pcb            # PCB layout
-  BT-MV Duo 01 Deck.kicad_prl            # Local project settings
-  BT-MV Duo 01 Deck.kicad_pro            # KiCad project file
-
-  MV Duo 01 Deck Schematics/             # Hierarchical schematics
-    BT-MV Duo 01 Deck.kicad_sch          # Top-level schematic
-    BT-Power_CFexp.kicad_sch             # Power + Crazyflie expansion interface
-    BT-SDcard.kicad_sch                  # microSD (SD/MMC)
-    BT-USB_UART.kicad_sch                # USB + UART debug
-    BT-CameraOV.kicad_sch                # Camera connector + signals
-    BT-MV_DM01.kicad_sch                 # Duo Module integration (pins/straps)
-    BT-Others.kicad_sch                  # LEDs, buttons, misc
-
-  BT-MVD01 libraries/                    # Custom KiCad libraries
-    Symbols and Footprints/
-    3D Models/
-    BT-Milk V Duo S.pretty/              # Footprint library
-
-  BT-MV Duo 01 Deck.csv                  # BOM
-  BT-MV Duo 01 Deck.kicad_dru            # Design rules
-
-  Related Work/
-    CF Proto Exp/                        # Bitcraze deck template/docs
-    Milk Module schematics/              # Module + EVB references
-    Camera OV5674/                       # Camera reference material (may include mixed sensor notes)
+  Hardware Setup/
+    BT-MV Duo 01 Deck_3D_full.pdf       # Full 3D render/export of the assembled PCB
+    BT-MV Duo 01 Deck_BD.pdf            # PCB deck block diagram (general / power supply)
+    BT-MV Duo 01 Deck_Lay.pdf           # PCB layer plots/export (copper, silkscreen, mask, etc.)
+    BT-MV Duo 01 Deck_Sch.pdf           # Schematic export (PDF)
+    LayStackup.pdf                      # PCB layer stack-up definition (materials / thicknesses)
