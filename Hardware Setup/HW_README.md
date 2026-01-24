@@ -60,8 +60,9 @@ Most likely causes (current hypotheses):
 ```text
 BT-MV Duo 01 Deck/
   Hardware Setup/
-    BT-MV Duo 01 Deck_3D_full.pdf       # Full 3D render/export of the assembled PCB
-    BT-MV Duo 01 Deck_BD.pdf            # PCB deck block diagram (general / power supply)
-    BT-MV Duo 01 Deck_Lay.pdf           # PCB layer plots/export (copper, silkscreen, mask, etc.)
-    BT-MV Duo 01 Deck_Sch.pdf           # Schematic export (PDF)
-    LayStackup.pdf                      # PCB layer stack-up definition (materials / thicknesses)
+    BT-MV Duo 01 Deck_3D_full.pdf        # Full 3D render/export of the assembled PCB
+    BT-MV Duo 01 Deck_BD.pdf             # PCB deck block diagram (general / power supply)
+    BT-MV Duo 01 Deck_BOM.csv            # Bill of Materials (component list)
+    BT-MV Duo 01 Deck_Lay.pdf            # PCB layer plots/export (copper, silkscreen, mask, etc.)
+    BT-MV Duo 01 Deck_LayStackup.pdf     # PCB layer stack-up definition (materials / thicknesses)
+    BT-MV Duo 01 Deck_Sch.pdf            # Schematic export (PDF)
