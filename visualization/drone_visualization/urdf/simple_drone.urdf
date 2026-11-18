@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<robot name="simple_drone">
+  
+  <!-- Base Link (fixed world reference) -->
+  <link name="base_link"/>
+
+  <!-- Invisible intermediate links (zero size) -->
+  <link name="roll_link"/>
+  <link name="pitch_link"/>
+  <link name="yaw_link"/>
+
+  <!-- Drone Body (the only visible element) -->
+  <link name="drone_body">
+    <visual>
+      <geometry>
+        <box size="0.35 0.35 0.05"/>
+      </geometry>
+      <material name="blue">
+        <color rgba="0.0 0.5 1.0 1.0"/>
+      </material>
+    </visual>
+    <!-- arrow -->
+    <visual>
+      <origin xyz="0.2 0 0.03" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.1 0.05 0.01"/>
+      </geometry>
+      <material name="orange">
+        <color rgba="1.0 0.5 0.0 1.0"/>
+      </material>
+    </visual>
+  </link>
+
+  <!-- Roll Joint - zero offset -->
+  <joint name="roll_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="roll_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="-1 0 0"/>
+  </joint>
+
+  <!-- Pitch Joint - zero offset -->
+  <joint name="pitch_joint" type="continuous">
+    <parent link="roll_link"/>
+    <child link="pitch_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <!-- Yaw Joint - zero offset -->
+  <joint name="yaw_joint" type="continuous">
+    <parent link="pitch_link"/>
+    <child link="yaw_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <!-- Attach drone body directly to yaw link (zero offset) -->
+  <joint name="body_joint" type="fixed">
+    <parent link="yaw_link"/>
+    <child link="drone_body"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+</robot>

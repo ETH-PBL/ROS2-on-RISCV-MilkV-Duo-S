@@ -1,21 +1,24 @@
 # BT-MV Duo 01 Deck
-*A Crazyflie 2.1 expansion deck that brings a Milk-V Duo Module 01 into the nano-UAV world — with hooks for SD/MMC, USB, and a camera.*
+*A Crazyflie 2.1 expansion deck that brings a Milk-V Duo Module 01 (Sophgo SG2000) onto the nano-UAV, with microSD, USB, UART and a camera connector.*
 
-> **Status (Rev-A):** boots over UART and power is solid.  
-> **Blockers:** SD/MMC and USB are not working yet, which prevents full end-to-end camera validation.
+> **Status (Rev-A):** fully operational as a ROS 2 companion computer. The board boots Ubuntu 22.04 from microSD and runs native ROS 2 Humble; power, microSD, USB, Wi-Fi and the UART link to the Crazyflie are validated.
+> **Open item:** the camera interface is not validated yet.
+
+Rev-A is the platform used for all ROS 2 experiments and measurements reported in this repository.
 
 ---
 
 ## What this project is
-This repository contains the hardware design for a Crazyflie 2.1 deck integrating a Milk-V Duo Module 01 (dual-core SoM) to enable on-board compute beyond the stock platform. The aim is a lightweight, compact board that can be manufactured, assembled, and iterated on like any other Crazyflie expansion deck.
+This folder contains the hardware design of a Crazyflie 2.1 deck integrating a Milk-V Duo Module 01. The module carries the Sophgo SG2000 SoC (two RISC-V C906 cores, 512 MB of in-package DRAM, 0.5 TOPS TPU) and Wi-Fi 6, and weighs 6.7 g. The deck gives the Crazyflie an on-board Linux computer in a lightweight, compact board that can be manufactured, assembled, and iterated on like any other Crazyflie expansion deck.
 
 ---
 
 ## Highlights
 - Crazyflie deck form factor (mechanically compatible)
 - Milk-V Duo Module 01 integration
-- Power path designed for both Crazyflie supply (VCOM) and external USB 5 V (VBUS) with automatic switchover
-- Interfaces on the board (intended): microSD (SD/MMC), USB 2.0, OV5647-style camera connector, UART debug
+- Power path for both Crazyflie supply (VCOM) and external USB 5 V (VBUS) with automatic switchover
+- Direct UART connection to the Crazyflie flight controller (UART2, 115200 baud)
+- Interfaces on the board: microSD (SD/MMC), USB 2.0, OV5647-style camera connector, UART debug
 
 ---
 
@@ -24,45 +27,42 @@ This repository contains the hardware design for a Crazyflie 2.1 deck integratin
 - 3.3 V rail is stable across expected input conditions
 - VBUS/VCOM switchover behaves as intended (no brown-out observed during switching)
 
-### Boot & console
-- RISC-V boot path reachable via UART
-- U-Boot prompt available and interactive
+### Boot & storage
+- Boots Ubuntu 22.04 with the custom kernel from microSD
+- U-Boot prompt and Linux console available over the UART debug port
+
+### USB
+- USB 2.0 interface operational
+
+### Communication
+- UART2 link to the Crazyflie flight controller: attitude stream received at 100 Hz
+- Wi-Fi link to a remote computer: ROS 2 messages exchanged over DDS
+
+### Power consumption
+Measured at board level with a Keysight N6705C supplying 5 V. The values cover the complete deck (SoC, USB subsystem, Wi-Fi module, microSD card, power management, status LEDs).
+
+| Operating phase              | Mean   | Peak   |
+|------------------------------|--------|--------|
+| Idle, Linux only             | 443 mW | –      |
+| ROS 2 start-up               | 534 mW | –      |
+| Active publishing (35–45 Hz) | 510 mW | –      |
+| Reboot                       | 540 mW | 746 mW |
 
 ---
 
-## What does *not* work yet (known issues)
-### SD/MMC (microSD)
-Symptoms:
-- SDHCI initialisation repeatedly times out
-- Environment load from FAT fails; boot falls back to defaults
-
-Most likely causes (current hypotheses):
-- Signal integrity / timing margin issues on CMD/CLK/DAT lines
-- Protection / filtering choice on the SD bus introducing too much series impedance
-
-### USB (device not recognised)
-Symptoms:
-- VBUS present (board powers), but host does not enumerate the device
-- Removing protection components on D+/D− did not resolve enumeration
-
-Most likely causes (current hypotheses):
-- Attach signalling / CC configuration (if USB-C path is involved)
-- D+/D− routing/impedance/return path issues
-
+## Not validated yet
 ### Camera
-- Camera rails exist and basic clock presence was observed on Rev-A,
-  but full camera bring-up is blocked until a reliable flashing / data path exists
-  (SD and/or USB need to work first).
+- Camera rails exist and basic clock presence was observed on Rev-A; full camera bring-up has not been validated yet.
 
 ---
 
-## Repository structure
+## Folder contents
 ```text
-BT-MV Duo 01 Deck/
-  Hardware Setup/
-    BT-MV Duo 01 Deck_3D_full.pdf        # Full 3D render/export of the assembled PCB
-    BT-MV Duo 01 Deck_BD.pdf             # PCB deck block diagram (general / power supply)
-    BT-MV Duo 01 Deck_BOM.csv            # Bill of Materials (component list)
-    BT-MV Duo 01 Deck_Lay.pdf            # PCB layer plots/export (copper, silkscreen, mask, etc.)
-    BT-MV Duo 01 Deck_LayStackup.pdf     # PCB layer stack-up definition (materials / thicknesses)
-    BT-MV Duo 01 Deck_Sch.pdf            # Schematic export (PDF)
+Hardware Setup/
+  BT-MV Duo 01 Deck_3D_full.pdf        # Full 3D render/export of the assembled PCB
+  BT-MV Duo 01 Deck_BD.pdf             # PCB deck block diagram (general / power supply)
+  BT-MV Duo 01 Deck_BOM.csv            # Bill of Materials (component list)
+  BT-MV Duo 01 Deck_Lay.pdf            # PCB layer plots/export (copper, silkscreen, mask, etc.)
+  BT-MV Duo 01 Deck_LayStackup.pdf     # PCB layer stack-up definition (materials / thicknesses)
+  BT-MV Duo 01 Deck_Sch.pdf            # Schematic export (PDF)
+```

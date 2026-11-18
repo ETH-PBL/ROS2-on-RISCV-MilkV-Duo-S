@@ -1,3 +1,7 @@
+# Setup Guide
+Complete build instructions for the system in this repository: the Ubuntu 22.04 image for the Sophgo SG2000, the ROS 2 Humble build for riscv64, the Crazyflie firmware driver, the ROS 2 bridge node and the remote visualization. To run a system that is already set up, see [`README.md`](README.md).
+
+
 # System Requirements Overview
 ## Development Workstation (Ubuntu Computer)
 **For building custom Ubuntu image and compiling ROS 2 in QEMU:**
@@ -11,6 +15,8 @@
 - **OS:** Ubuntu 20.04 LTS or newer (tested on 22.04)
 - **Privileges:** Sudo access required for debootstrap and image operations
 # Part 1: Build custom ubuntu Image
+The custom deck uses the same SDK build target as the Milk-V Duo S (`milkv-duos-musl-riscv64-sd`), so the resulting image runs on both boards.
+
 **On ubuntu computer**
 ## 1.1: Install required dependencies
 ```bash
@@ -62,7 +68,7 @@ ninja --version
 mkdir -p MilkV_DuoS_Ubuntu_Build
 cd MilkV_DuoS_Ubuntu_Build
 
-# Clone SDK V2 (for Duo S with SG2000)
+# Clone SDK V2 (for SG2000 boards)
 git clone https://github.com/milkv-duo/duo-buildroot-sdk-v2.git --depth=1
 
 cd duo-buildroot-sdk-v2
@@ -337,7 +343,7 @@ sudo dd if=MilkV_DuoS_Ubuntu_Build/milkv-duos-ubuntu22.img \
 sync
 ```
 ## 1.10: Boot and Test
-1. Insert SD card into MilkV Duo S
+1. Insert SD card into the board
 2. Connect USB-C cable
 ### 1.10.1: Connect
 - Username: root
@@ -706,111 +712,18 @@ sudo udevadm trigger
 
 **Plug the Crazyradio into an USB Port**
 ### 3.1.3: Configure Firmware
-#### 3.1.3.1: Create UART Publisher code
+#### 3.1.3.1: Add the UART deck driver
+The deck driver is [`firmware/imuUartDeck.c`](firmware/imuUartDeck.c). It reads the roll, pitch and yaw estimates through the firmware logging framework and sends them over UART2 at 100 Hz. Each packet is 10 bytes: a `0xAA55` header, three signed 16-bit angles in hundredths of a degree, and a `0x55AA` footer.
 ```bash
+# Get the source files of this repository
+git clone https://github.com/ETH-PBL/ROS2-on-RISCV-MilkV-Duo-S.git ~/ROS2-on-RISCV-MilkV-Duo-S
+
 cd Crazyflie/crazyflie-firmware
 # Load default configuration
 make cf2_defconfig
 
-nano src/deck/drivers/src/imuUartDeck.c
+cp ~/ROS2-on-RISCV-MilkV-Duo-S/firmware/imuUartDeck.c src/deck/drivers/src/
 ```
-
-*Paste this publisher code:* It takes the angles from the crazyflie state estimates and sends it over uart at 100Hz.
-```c
-#define DEBUG_MODULE "ANGLEUART"
-
-#include <stdint.h>
-#include "FreeRTOS.h"
-#include "task.h"
-#include "deck.h"
-#include "uart2.h"
-#include "log.h"
-#include "debug.h"
-
-#define UART_BAUDRATE 115200
-#define SEND_FREQUENCY_MS 10    // 100Hz
-
-#define PACKET_HEADER 0xAA55
-#define PACKET_FOOTER 0x55AA
-
-typedef struct {
-    uint16_t header;
-    int16_t roll;
-    int16_t pitch;
-    int16_t yaw;
-    uint16_t footer;
-} __attribute__((packed)) AttitudePacket;
-
-static int logIdRoll, logIdPitch, logIdYaw;
-static bool logIdsInitialized = false;
-
-static void initLogIds() {
-    if (!logIdsInitialized) {
-        logIdRoll = logGetVarId("stateEstimate", "roll");
-        logIdPitch = logGetVarId("stateEstimate", "pitch");
-        logIdYaw = logGetVarId("stateEstimate", "yaw");
-        
-        if (logIdRoll != -1 && logIdPitch != -1 && logIdYaw != -1) {
-            logIdsInitialized = true;
-            DEBUG_PRINT("ANGLE UART: Initialized\n");
-        }
-    }
-}
-
-static void angleUartTask(void *param) {
-    TickType_t lastWakeTime = xTaskGetTickCount();
-    AttitudePacket packet;
-    float roll, pitch, yaw;
-    
-    vTaskDelay(M2T(1000));
-    
-    while(1) {
-        if (!logIdsInitialized) {
-            initLogIds();
-            vTaskDelayUntil(&lastWakeTime, M2T(SEND_FREQUENCY_MS));
-            continue;
-        }
-        
-        roll = logGetFloat(logIdRoll);
-        pitch = logGetFloat(logIdPitch);
-        yaw = logGetFloat(logIdYaw);
-        
-        packet.header = PACKET_HEADER;
-        packet.roll = (int16_t)(roll * 100.0f);
-        packet.pitch = (int16_t)(pitch * 100.0f);
-        packet.yaw = (int16_t)(yaw * 100.0f);
-        packet.footer = PACKET_FOOTER;
-        
-        uart2SendData(sizeof(packet), (uint8_t*)&packet);
-        
-        vTaskDelayUntil(&lastWakeTime, M2T(SEND_FREQUENCY_MS));
-    }
-}
-
-static void angleUartDeckInit(DeckInfo *info) {
-    uart2Init(UART_BAUDRATE);
-    DEBUG_PRINT("ANGLE UART: Started\n");
-    
-    xTaskCreate(angleUartTask, "ANGLEUART", 
-                configMINIMAL_STACK_SIZE * 2, NULL, 
-                3, NULL);
-}
-
-static bool angleUartDeckTest() {
-    return true;
-}
-
-static const DeckDriver angleUartDeck = {
-    .name = "bcIMUUART",
-    .usedGpio = 0,
-    .usedPeriph = DECK_USING_UART2,
-    .init = angleUartDeckInit,
-    .test = angleUartDeckTest,
-};
-
-DECK_DRIVER(angleUartDeck);
-```
-*Save and exit*
 #### 3.1.3.2: Add it as a deck
 ```bash
 nano src/deck/drivers/src/Kconfig
@@ -819,11 +732,11 @@ nano src/deck/drivers/src/Kconfig
 Add before the final `endmenu`:
 ``` 
 config DECK_IMU_UART
-	bool "Support custom IMU UART streaming deck" 
+	bool "Support custom attitude UART streaming deck" 
 	default n 
 	select DECK_UART2 
 	help 
-		Streams IMU data over UART2
+		Streams the attitude estimate over UART2
 ```
 
 ```bash
@@ -864,7 +777,7 @@ The compiled firmware will be at `build/cf2.bin`
 cfloader flash build/cf2.bin stm32-fw
 ```
 
-Wait for "Restart the Crazyflie..." and flashing to complete. The crazyflie should now continuously transmit the IMU angles over UART. 
+Wait for "Restart the Crazyflie..." and flashing to complete. The crazyflie should now continuously transmit the attitude angles (roll, pitch, yaw) over UART2. 
 ## 3.2: Prepare demo on Linux Mint computer
 **Can also be done on ubuntu, but I did it in Mint**
 ### 3.2.1: Install and configure Docker
@@ -904,40 +817,11 @@ docker run hello-world # Should return "Hello from Docker!"
 ```bash
 mkdir -p ~/drone_viz_ws/src
 docker pull osrf/ros:humble-desktop-full
-nano ~/start_ros2_container.sh
-```
 
-Paste this content:
-```bash
-#!/bin/bash
-
-CONTAINER_NAME="ros2_drone_viz"
-
-# Check if container already exists
-if [ "$(docker ps -aq -f name=$CONTAINER_NAME)" ]; then
-    echo "Container exists. Starting it..."
-    docker start $CONTAINER_NAME
-    docker exec -it $CONTAINER_NAME bash
-else
-    echo "Creating new container..."
-    xhost +local:docker
-    
-    docker run -it \
-        --name $CONTAINER_NAME \
-        --network host \
-        --env DISPLAY=$DISPLAY \
-        --env QT_X11_NO_MITSHM=1 \
-        --volume /tmp/.X11-unix:/tmp/.X11-unix:rw \
-        --volume ~/drone_viz_ws:/root/drone_viz_ws:rw \
-        --device /dev/dri:/dev/dri \
-        osrf/ros:humble-desktop-full \
-        bash
-fi
-```
-Save and exit
-
-```bash
-# Make it executable
+# Get the container start script from this repository
+git clone https://github.com/ETH-PBL/ROS2-on-RISCV-MilkV-Duo-S.git ~/ROS2-on-RISCV-MilkV-Duo-S
+cp ~/ROS2-on-RISCV-MilkV-Duo-S/visualization/start_ros2_container.sh ~/drone_viz_ws/
+cd ~/drone_viz_ws
 chmod +x start_ros2_container.sh
 
 # Allow Docker GUI Access
@@ -947,12 +831,16 @@ xhost +local:docker
 ./start_ros2_container.sh
 ```
 ### 3.2.3: Create Visualization Package (Inside Container)
+The package files are in [`visualization/drone_visualization/`](visualization/drone_visualization/).
 ```bash
-# Install pip
+# Install tools
 apt update
-apt install -y nano python3-pip
+apt install -y nano git python3-pip
 
-pip3 install pyserial psutil --break-system-packages
+# Get the source files of this repository
+cd /root
+git clone https://github.com/ETH-PBL/ROS2-on-RISCV-MilkV-Duo-S.git
+REPO=/root/ROS2-on-RISCV-MilkV-Duo-S/visualization/drone_visualization
 
 # Create Ros2 Package
 cd /root/drone_viz_ws/src
@@ -961,231 +849,26 @@ source /opt/ros/humble/setup.bash
 ros2 pkg create --build-type ament_python drone_visualization \
   --dependencies rclpy sensor_msgs urdf robot_state_publisher
 
-# Create URDF Model
+# Add the URDF model, which describes the drone in rviz
 cd /root/drone_viz_ws/src/drone_visualization
 mkdir urdf
-nano urdf/simple_drone.urdf
+cp $REPO/urdf/simple_drone.urdf urdf/
 ```
-
-Paste this content, which describes the drone in rviz:
-```xml
-<?xml version="1.0"?>
-<robot name="simple_drone">
-  
-  <!-- Base Link (fixed world reference) -->
-  <link name="base_link"/>
-
-  <!-- Invisible intermediate links (zero size) -->
-  <link name="roll_link"/>
-  <link name="pitch_link"/>
-  <link name="yaw_link"/>
-
-  <!-- Drone Body (the only visible element) -->
-  <link name="drone_body">
-    <visual>
-      <geometry>
-        <box size="0.35 0.35 0.05"/>
-      </geometry>
-      <material name="blue">
-        <color rgba="0.0 0.5 1.0 1.0"/>
-      </material>
-    </visual>
-    <!-- arrow -->
-    <visual>
-      <origin xyz="0.2 0 0.03" rpy="0 0 0"/>
-      <geometry>
-        <box size="0.1 0.05 0.01"/>
-      </geometry>
-      <material name="orange">
-        <color rgba="1.0 0.5 0.0 1.0"/>
-      </material>
-    </visual>
-  </link>
-
-  <!-- Roll Joint - zero offset -->
-  <joint name="roll_joint" type="continuous">
-    <parent link="base_link"/>
-    <child link="roll_link"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-    <axis xyz="-1 0 0"/>
-  </joint>
-
-  <!-- Pitch Joint - zero offset -->
-  <joint name="pitch_joint" type="continuous">
-    <parent link="roll_link"/>
-    <child link="pitch_link"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
-  </joint>
-
-  <!-- Yaw Joint - zero offset -->
-  <joint name="yaw_joint" type="continuous">
-    <parent link="pitch_link"/>
-    <child link="yaw_link"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-    <axis xyz="0 0 1"/>
-  </joint>
-
-  <!-- Attach drone body directly to yaw link (zero offset) -->
-  <joint name="body_joint" type="fixed">
-    <parent link="yaw_link"/>
-    <child link="drone_body"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-  </joint>
-
-</robot>
-```
-Save and exit
-### 3.2.4: Create Launch file
+### 3.2.4: Add the Launch file
 ```bash
 mkdir launch
-nano launch/visualize_drone.launch.py
+cp $REPO/launch/visualize_drone.launch.py launch/
 ```
-
-Paste this content:
-```python
-#!/usr/bin/env python3
-import os
-from ament_index_python.packages import get_package_share_directory
-from launch import LaunchDescription
-from launch_ros.actions import Node
-
-def generate_launch_description():
-    # Get URDF file path
-    urdf_file = os.path.join(
-        get_package_share_directory('drone_visualization'),
-        'urdf',
-        'simple_drone.urdf'
-    )
-    
-    # Read URDF content
-    with open(urdf_file, 'r') as file:
-        robot_description = file.read()
-    
-    # Robot State Publisher node
-    robot_state_publisher = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        name='robot_state_publisher',
-        output='screen',
-        parameters=[{
-            'robot_description': robot_description,
-            'use_sim_time': False
-        }]
-    )
-    
-    # RViz2 node
-    rviz_config_file = os.path.join(
-        get_package_share_directory('drone_visualization'),
-        'rviz',
-        'drone_view.rviz'
-    )
-    
-    rviz_node = Node(
-        package='rviz2',
-        executable='rviz2',
-        name='rviz2',
-        output='screen',
-        arguments=['-d', rviz_config_file] if os.path.exists(rviz_config_file) else []
-    )
-    
-    return LaunchDescription([
-        robot_state_publisher,
-        rviz_node
-    ])
-```
-Save and exit.
-### 3.2.5: Create RViz Config
+### 3.2.5: Add the RViz Config
 ```bash
 mkdir rviz
-nano rviz/drone_view.rviz
+cp $REPO/rviz/drone_view.rviz rviz/
 ```
-
-Paste this content, which describes the rviz environment
-```yaml
-Panels:
-  - Class: rviz_common/Displays
-    Name: Displays
-  - Class: rviz_common/Views
-    Name: Views
-
-Visualization Manager:
-  Displays:
-    - Class: rviz_default_plugins/Grid
-      Name: Grid
-      Enabled: true
-      
-    - Class: rviz_default_plugins/RobotModel
-      Name: RobotModel
-      Enabled: true
-      Description Topic:
-        Value: /robot_description
-      Visual Enabled: true
-      
-    - Class: rviz_default_plugins/TF
-      Name: TF
-      Enabled: false
-      Show Axes: true
-      Show Names: true
-      
-  Global Options:
-    Fixed Frame: base_link
-    
-  Views:
-    Current:
-      Class: rviz_default_plugins/Orbit
-      Distance: 1.5
-      Focal Point:
-        X: 0.0
-        Y: 0.0
-        Z: 0.0
-      Yaw: 0.785
-      Pitch: 0.524
-```
-Save and exit.
 ### 3.2.6: Configure Package Setup
+Replace the generated `setup.py` with the one from this repository, which also installs the launch, URDF and RViz files:
 ```bash
-cd /root/drone_viz_ws/src/drone_visualization
-nano setup.py
+cp $REPO/setup.py /root/drone_viz_ws/src/drone_visualization/setup.py
 ```
-
-Replace the content with:
-```python
-from setuptools import find_packages, setup
-import os
-from glob import glob
-
-package_name = 'drone_visualization'
-
-setup(
-    name=package_name,
-    version='0.0.0',
-    packages=find_packages(exclude=['test']),
-    data_files=[
-        ('share/ament_index/resource_index/packages',
-            ['resource/' + package_name]),
-        ('share/' + package_name, ['package.xml']),
-        (os.path.join('share', package_name, 'launch'),
-            glob('launch/*.py')),
-        (os.path.join('share', package_name, 'urdf'),
-            glob('urdf/*.urdf')),
-        (os.path.join('share', package_name, 'rviz'),
-            glob('rviz/*.rviz')),
-    ],
-    install_requires=['setuptools'],
-    zip_safe=True,
-    maintainer='your_name',
-    maintainer_email='your_email@example.com',
-    description='Simple drone visualization',
-    license='Apache-2.0',
-    tests_require=['pytest'],
-    entry_points={
-        'console_scripts': [
-        ],
-    },
-)
-```
-Save and exit.
 ### 3.2.7: Build Package
 ```bash
 cd /root/drone_viz_ws
@@ -1203,9 +886,16 @@ echo "export ROS_DOMAIN_ID=42" >> ~/.bashrc
 source ~/.bashrc
 ```
 
-## 3.3: Prepare demo on MilkV
-**SSH into the MilkV board**
+## 3.3: Prepare demo on the SG2000 board
+**SSH into the board**
+```bash
+# Get the source files of this repository
+cd ~
+git clone https://github.com/ETH-PBL/ROS2-on-RISCV-MilkV-Duo-S.git
+```
 ### 3.3.1: Set up UART
+The pin names, the `duo-pinmux` tool and the UART device are the same on the custom deck and on the Duo S.
+
 #### 3.3.1.1: Install duo-pinmux
 Download the "duo-pinmux" file from https://github.com/tommasopolonelli/rtkbase_riscv/tree/master/duo-pinmux/duos
 
@@ -1241,301 +931,15 @@ cd ~/crazyflie_ws/src
 ros2 pkg create --build-type ament_python crazyflie_imu \
   --dependencies rclpy sensor_msgs std_msgs
 ```
-### 3.3.3: Create IMU Publisher node
+### 3.3.3: Add the bridge node
+The bridge node is [`ros2/crazyflie_imu/imu_uart_publisher.py`](ros2/crazyflie_imu/imu_uart_publisher.py). It reads the attitude packets from UART2, publishes roll, pitch and yaw as `JointState` messages on `/joint_states`, and prints the runtime statistics (CPU, memory, UART and ROS 2 rates).
 ```bash
-cd ~/crazyflie_ws/src/crazyflie_imu/crazyflie_imu
-nano imu_uart_publisher.py
+cp ~/ROS2-on-RISCV-MilkV-Duo-S/ros2/crazyflie_imu/imu_uart_publisher.py \
+   ~/crazyflie_ws/src/crazyflie_imu/crazyflie_imu/
 ```
-
-Paste this code, which takes the angles from uart and publishes them over the ROS network. It also outputs relevant system data.
-```python
-#!/usr/bin/env python3
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import JointState
-from std_msgs.msg import Header
-import serial
-import struct
-import time
-import threading
-import psutil
-import os
-
-class ImuUartPublisher(Node):
-    def __init__(self):
-        super().__init__('imu_uart_publisher')
-        
-        # Publisher for joint states
-        self.publisher = self.create_publisher(JointState, 'joint_states', 10)
-        
-        # UART configuration
-        self.uart_port = '/dev/ttyS2'
-        self.baudrate = 115200
-        self.packet_header = 0xAA55
-        self.packet_footer = 0x55AA
-        self.packet_size = 10
-        
-        # Thread-safe data storage
-        self.latest_roll = 0.0
-        self.latest_pitch = 0.0
-        self.latest_yaw = 0.0
-        self.data_lock = threading.Lock()
-        self.packet_count = 0
-        self.published_count = 0
-        
-        # Performance monitoring
-        self.start_time = time.time()
-        self.process = psutil.Process(os.getpid())
-        
-        # Initialize CPU measurements (establish baseline)
-        psutil.cpu_percent(interval=None)
-        self.process.cpu_percent(interval=None)
-        time.sleep(0.1)
-        
-        # Rate calculation tracking
-        self.last_packet_count = 0
-        self.last_published_count = 0
-        self.last_rate_calc_time = time.time()
-        
-        # Stats update interval
-        self.stats_interval = 0.1
-        
-        # Initialize serial connection
-        try:
-            self.ser = serial.Serial(
-                port=self.uart_port,
-                baudrate=self.baudrate,
-                timeout=0.1
-            )
-            self.ser.reset_input_buffer()
-            time.sleep(0.5)
-            self.get_logger().info(f'UART opened on {self.uart_port}')
-            
-        except serial.SerialException as e:
-            self.get_logger().error(f'Cannot open UART: {e}')
-            return
-        
-        # Start continuous reading thread
-        self.running = True
-        self.read_thread = threading.Thread(target=self.uart_read_loop, daemon=True)
-        self.read_thread.start()
-        
-        # Create timer for publishing at 50Hz
-        self.timer = self.create_timer(0.02, self.publish_callback)
-        
-        # Create timer for stats display
-        self.stats_timer = self.create_timer(self.stats_interval, self.print_statistics)
-    
-    def get_system_stats(self):
-        try:
-            process_cpu = min(self.process.cpu_percent(interval=None), 100.0)
-            process_mem_mb = self.process.memory_info().rss / 1024 / 1024
-            system_cpu = psutil.cpu_percent(interval=None)
-            system_mem = psutil.virtual_memory()
-            system_swap = psutil.swap_memory()
-            runtime = time.time() - self.start_time
-            return {
-                'process_cpu': process_cpu,
-                'process_mem_mb': process_mem_mb,
-                'system_cpu': system_cpu,
-                'system_mem_percent': system_mem.percent,
-                'system_mem_mb': system_mem.used / 1024 / 1024,
-                'system_mem_total_mb': system_mem.total / 1024 / 1024,
-                'system_swap_percent': system_swap.percent,
-                'system_swap_mb': system_swap.used / 1024 / 1024,
-                'runtime_seconds': runtime
-            }
-        except Exception as e:
-            self.get_logger().error(f'Error in get_system_stats: {e}')
-            return None
-    
-    def print_statistics(self):
-        current_time = time.time()
-        elapsed = current_time - self.last_rate_calc_time
-        
-        stats = self.get_system_stats()
-        if stats is None:
-            return
-        
-        runtime = stats['runtime_seconds']
-        hours = int(runtime // 3600)
-        minutes = int((runtime % 3600) // 60)
-        seconds = int(runtime % 60)
-        
-        # Get current counts (thread-safe)
-        with self.data_lock:
-            current_packets = self.packet_count
-            current_published = self.published_count
-            roll = self.latest_roll
-            pitch = self.latest_pitch
-            yaw = self.latest_yaw
-        
-        # Calculate instantaneous rates
-        uart_rate = (current_packets - self.last_packet_count) / elapsed if elapsed > 0 else 0
-        ros_rate = (current_published - self.last_published_count) / elapsed if elapsed > 0 else 0
-        
-        # Update tracking variables
-        self.last_packet_count = current_packets
-        self.last_published_count = current_published
-        self.last_rate_calc_time = current_time
-        
-        # Build compact output (3 lines)
-        output = f"\r\033[K"
-        
-        # Line 1: Time and Process metrics
-        output += f"[{hours:02d}:{minutes:02d}:{seconds:02d}] "
-        output += f"Process: CPU {stats['process_cpu']:5.1f}% | RAM {stats['process_mem_mb']:5.1f}MB"
-        
-        # Line 2: System metrics
-        output += f"\n\033[K"
-        output += f"System:  CPU {stats['system_cpu']:5.1f}% | "
-        output += f"RAM {stats['system_mem_percent']:4.1f}% ({stats['system_mem_mb']:.0f}/{stats['system_mem_total_mb']:.0f}MB)"
-        
-        # Add swap if being used
-        if stats['system_swap_percent'] > 0.1:
-            output += f" | Swap {stats['system_swap_percent']:4.1f}% ({stats['system_swap_mb']:.0f}MB)"
-        
-        # Line 3: Communication rates and attitude
-        output += f"\n\033[K"
-        output += f"Rates:   UART {uart_rate:6.1f}Hz | ROS {ros_rate:5.1f}Hz | "
-        output += f"Attitude: R:{roll:6.2f}° P:{pitch:6.2f}° Y:{yaw:6.2f}°"
-        
-        # Move cursor up 2 lines
-        output += "\033[2A"
-        
-        print(output, end='', flush=True)
-    
-    def find_header(self):
-        """Find packet header for synchronization"""
-        buffer = bytearray()
-        timeout = 1000
-        
-        while timeout > 0 and self.running:
-            byte = self.ser.read(1)
-            if len(byte) == 0:
-                timeout -= 1
-                continue
-                
-            buffer.append(byte[0])
-            if len(buffer) > 2:
-                buffer.pop(0)
-            
-            if len(buffer) == 2:
-                value = struct.unpack('<H', bytes(buffer))[0]
-                if value == self.packet_header:
-                    return True
-        return False
-    
-    def uart_read_loop(self):
-        """Continuous UART reading thread"""
-        self.get_logger().info('UART reading thread started')
-        
-        if not self.find_header():
-            self.get_logger().error('Failed to synchronize!')
-            return
-        
-        self.get_logger().info('Synchronized with IMU stream')
-        print("\n\n\n")
-        
-        error_count = 0
-        
-        while self.running:
-            try:
-                data = self.ser.read(self.packet_size - 2)
-                
-                if len(data) != self.packet_size - 2:
-                    if self.find_header():
-                        continue
-                    break
-                
-                values = struct.unpack('<3hH', data)
-                roll_raw, pitch_raw, yaw_raw, footer = values
-                
-                if footer != self.packet_footer:
-                    error_count += 1
-                    if self.find_header():
-                        continue
-                    break
-                
-                roll = roll_raw / 100.0
-                pitch = pitch_raw / 100.0
-                yaw = yaw_raw / 100.0
-                
-                with self.data_lock:
-                    self.latest_roll = roll
-                    self.latest_pitch = pitch
-                    self.latest_yaw = yaw
-                    self.packet_count += 1
-                
-                if not self.find_header():
-                    break
-                    
-            except struct.error:
-                error_count += 1
-                if self.find_header():
-                    continue
-                break
-            except Exception as e:
-                print(f"\n\n\n")
-                self.get_logger().error(f'Read error: {e}')
-                break
-        
-        print(f"\n\n\n")
-        self.get_logger().warn('UART reading thread stopped')
-    
-    def publish_callback(self):
-        """Publish latest IMU data as joint states"""
-        with self.data_lock:
-            roll = self.latest_roll
-            pitch = self.latest_pitch
-            yaw = self.latest_yaw
-        
-        roll_rad = roll * 3.14159 / 180.0
-        pitch_rad = pitch * 3.14159 / 180.0
-        yaw_rad = yaw * 3.14159 / 180.0
-        
-        msg = JointState()
-        msg.header = Header()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        
-        msg.name = ['roll_joint', 'pitch_joint', 'yaw_joint']
-        msg.position = [roll_rad, pitch_rad, yaw_rad]
-        
-        self.publisher.publish(msg)
-        
-        with self.data_lock:
-            self.published_count += 1
-    
-    def destroy_node(self):
-        """Cleanup on shutdown"""
-        print(f"\n\n\n")
-        self.running = False
-        if hasattr(self, 'read_thread'):
-            self.read_thread.join(timeout=2.0)
-        if hasattr(self, 'ser') and self.ser.is_open:
-            self.ser.close()        
-        super().destroy_node()
-
-def main(args=None):
-    rclpy.init(args=args)
-    node = ImuUartPublisher()
-    
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        node.destroy_node()
-        rclpy.shutdown()
-
-
-if __name__ == '__main__':
-    main()
-```
-Save and exit
 ### 3.3.4: Prepare package build
 ```bash
-pip3 install pyserial
+pip3 install pyserial psutil
 cd ~/crazyflie_ws/src/crazyflie_imu
 nano setup.py
 ```
