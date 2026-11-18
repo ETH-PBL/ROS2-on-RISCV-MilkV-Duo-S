@@ -715,8 +715,8 @@ sudo udevadm trigger
 #### 3.1.3.1: Add the UART deck driver
 The deck driver is [`firmware/imuUartDeck.c`](firmware/imuUartDeck.c). It reads the roll, pitch and yaw estimates through the firmware logging framework and sends them over UART2 at 100 Hz. Each packet is 10 bytes: a `0xAA55` header, three signed 16-bit angles in hundredths of a degree, and a `0x55AA` footer.
 ```bash
-# Get the source files of this repository
-git clone https://github.com/ETH-PBL/ROS2-on-RISCV-MilkV-Duo-S.git ~/ROS2-on-RISCV-MilkV-Duo-S
+# Get the source files of this repository (skipped if already cloned)
+[ -d ~/ROS2-on-RISCV-MilkV-Duo-S ] || git clone https://github.com/ETH-PBL/ROS2-on-RISCV-MilkV-Duo-S.git ~/ROS2-on-RISCV-MilkV-Duo-S
 
 cd Crazyflie/crazyflie-firmware
 # Load default configuration
@@ -818,8 +818,8 @@ docker run hello-world # Should return "Hello from Docker!"
 mkdir -p ~/drone_viz_ws/src
 docker pull osrf/ros:humble-desktop-full
 
-# Get the container start script from this repository
-git clone https://github.com/ETH-PBL/ROS2-on-RISCV-MilkV-Duo-S.git ~/ROS2-on-RISCV-MilkV-Duo-S
+# Get the container start script from this repository (clone skipped if already done)
+[ -d ~/ROS2-on-RISCV-MilkV-Duo-S ] || git clone https://github.com/ETH-PBL/ROS2-on-RISCV-MilkV-Duo-S.git ~/ROS2-on-RISCV-MilkV-Duo-S
 cp ~/ROS2-on-RISCV-MilkV-Duo-S/visualization/start_ros2_container.sh ~/drone_viz_ws/
 cd ~/drone_viz_ws
 chmod +x start_ros2_container.sh
